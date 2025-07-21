@@ -59,3 +59,39 @@ body {
     transform: translateX(0);
   }
 }
+
+/* Custom scrollbar for chat interface */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 4px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(147, 51, 234, 0.5);
+  border-radius: 4px;
+  border: 1px solid rgba(147, 51, 234, 0.2);
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 51, 234, 0.7);
+  border-color: rgba(147, 51, 234, 0.4);
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(147, 51, 234, 0.9);
+}
+
+/* Firefox scrollbar */
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(147, 51, 234, 0.5) rgba(99, 102, 241, 0.1);
+}
+
+/* Ensure smooth scrolling */
+.chat-scrollbar {
+  scroll-behavior: smooth;
+}

@@ -5,28 +5,43 @@ import * as THREE from "three";
 import { VISEMES } from "wawa-lipsync";
 import { lipsyncManager } from "../App";
 
+const facialExpression = {
+  browInnerUp: 0.17,
+    eyeSquintLeft: 0.4,
+    eyeSquintRight: 0.44,
+    noseSneerLeft: 0.1700000727403593,
+    noseSneerRight: 0.14000002836874015,
+    mouthPressLeft: 0.61,
+    mouthPressRight: 0.41000000000000003,}
+
 let setupMode = false;
 
 export function Avatar(props) {
   const { nodes, materials, scene } = useGLTF(
     "/models/686f742935402afcb99dd966.glb"
   );
-
-
-  const { animations } = useGLTF("/models/animations.glb");
-
+  
+  const {animations} = useGLTF("/models/animations.glb");
+  
   const group = useRef();
-  const { actions, mixer } = useAnimations(animations, group);
-  const [animation, setAnimation] = useState(
-    animations.find((a) => a.name === "Idle") ? "Idle" : animations[0].name // Check if Idle animation exists otherwise use first animation
-  );
+  const {actions, mixer} = useAnimations(animations, group);
+  const [animation, setAnimation] = useState(animations.find((a) => a.name === "Idle") ? "Idle" : animations[0].name);
+  const [prevIsSpeaking, setPrevIsSpeaking] = useState(false);
+  const [prevIsListening, setPrevIsListening] = useState(false);
+  
   useEffect(() => {
-    actions[animation]
-      ?.reset()
-      .fadeIn(mixer.stats.actions.inUse === 0 ? 0 : 0.5)
-      .play();
-    return () => actions[animation]?.fadeOut(0.5);
-  }, [animation]);
+    if (actions[animation]) {
+      actions[animation]
+        ?.reset()
+        .fadeIn(mixer.stats.actions.inUse === 0 ? 0 : 0.5)
+        .play();}
+        // If setupMode is true, we don't want 
+    return () => {
+      if (actions[animation]) {
+        actions[animation]?.fadeOut(0.5);
+      }
+    };
+  }, [animation, actions]);
 
   const lerpMorphTarget = (target, value, speed = 0.1) => {
     scene.traverse((child) => {
@@ -42,8 +57,7 @@ export function Avatar(props) {
           child.morphTargetInfluences[index],
           value,
           speed
-        );
-
+        );      
         if (!setupMode) {
           try {
             set({
@@ -59,7 +73,22 @@ export function Avatar(props) {
   const [winkLeft, setWinkLeft] = useState(false);
   const [winkRight, setWinkRight] = useState(false);
 
-  useFrame(() => {
+  useFrame((frameState) => {
+
+    if (!setupMode && nodes.EyeLeft?.morphTargetDictionary) {
+      Object.keys(nodes.EyeLeft.morphTargetDictionary).forEach((key) => {
+        const mapping = facialExpression;
+        if (key === "eyeBlinkLeft" || key === "eyeBlinkRight") {
+          return;
+        }
+        if (mapping && mapping[key]) {
+          lerpMorphTarget(key, mapping[key], 0.1);
+        } else {
+          lerpMorphTarget(key, 0, 0.1);
+        }
+      });
+    }
+    // Handle blinking
     lerpMorphTarget("eyeBlinkLeft", blink || winkLeft ? 1 : 0, 0.5);
     lerpMorphTarget("eyeBlinkRight", blink || winkRight ? 1 : 0, 0.5);
 
@@ -69,13 +98,62 @@ export function Avatar(props) {
     }
 
     const viseme = lipsyncManager.viseme;
-    const state = lipsyncManager.state;
+    const lipsyncState = lipsyncManager.state;
+    const isSpeaking = lipsyncManager.state === "speaking" || viseme !== "viseme_sil" || lipsyncManager.isSpeaking;
+    const isListening = lipsyncManager.isListening || false;
+    
+    // Debug logging for state changes
+    if (isListening !== prevIsListening) {
+      console.log("Avatar: Listening state changed from", prevIsListening, "to", isListening);
+    }
+    if (isSpeaking !== prevIsSpeaking) {
+      console.log("Avatar: Speaking state changed from", prevIsSpeaking, "to", isSpeaking);
+    }
+    
+    // Handle animation switching based on speaking and listening states
+    if (isSpeaking !== prevIsSpeaking || isListening !== prevIsListening) {
+      setPrevIsSpeaking(isSpeaking);
+      setPrevIsListening(isListening);
+      
+      if (isSpeaking) {
+        // Priority 1: Switch to talking animation with hand gestures
+        console.log("Avatar: Switching to talking animation");
+        const talkingAnimation = animations.find((a) => a.name === "Talking_1") || 
+                                animations.find((a) => a.name.toLowerCase().includes("talking")) ||
+                                animations.find((a) => a.name.toLowerCase().includes("talk"));
+        
+        if (talkingAnimation && actions[talkingAnimation.name]) {
+          setAnimation(talkingAnimation.name);
+        }
+      } else if (isListening) {
+        // Priority 2: Switch to listening animation
+        console.log("Avatar: Switching to listening animation");
+        const listeningAnimation = animations.find((a) => a.name === "Angry") || 
+                                  animations.find((a) => a.name.toLowerCase().includes("listening")) ||
+                                  animations.find((a) => a.name.toLowerCase().includes("listen"));
+        
+        if (listeningAnimation && actions[listeningAnimation.name]) {
+          setAnimation(listeningAnimation.name);
+        } else {
+          console.log("Avatar: No listening animation found, available animations:", animations.map(a => a.name));
+        }
+      } else {
+        // Priority 3: Switch back to idle animation
+        const idleAnimation = animations.find((a) => a.name === "Idle") || animations[0];
+        if (idleAnimation && actions[idleAnimation.name]) {
+          setAnimation(idleAnimation.name);
+        }
+      }
+    }
+    
+    // Apply current viseme
     lerpMorphTarget(
       viseme,
       1,
-      state === "vowel" ? 0.2 : 0.4
+      lipsyncState === "vowel" ? 0.2 : 0.4
     );
 
+    // Reset other visemes
     Object.values(VISEMES).forEach((value) => {
       if (viseme === value) {
         return;
@@ -83,7 +161,7 @@ export function Avatar(props) {
       lerpMorphTarget(
         value,
         0,
-        state === "vowel" ? 0.1 : 0.2
+        lipsyncState === "vowel" ? 0.1 : 0.2
       );
     });
   });
@@ -102,6 +180,18 @@ export function Avatar(props) {
     nextBlink();
     return () => clearTimeout(blinkTimeout);
   }, []);
+
+  // Leva controls for morph targets (optional, for debugging)
+  const [, set] = (() => {
+    try {
+      // Try to import useControls if leva is available
+      const { useControls } = require('leva');
+      return useControls("MorphTarget", () => ({}));
+    } catch (e) {
+      // Fallback if leva is not available
+      return [null, () => {}];
+    }
+  })();
 
   return (
     <group {...props} dispose={null} ref={group}>
@@ -172,5 +262,5 @@ export function Avatar(props) {
   );
 }
 
-useGLTF.preload("/models/64f1a714fe61576b46f27ca2.glb");
+useGLTF.preload("/models/686f742935402afcb99dd966.glb");
 useGLTF.preload("/models/animations.glb");
