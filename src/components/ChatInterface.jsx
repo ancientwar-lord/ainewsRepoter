@@ -46,7 +46,7 @@ const filterMarkdownForSpeech = (text) => {
     .trim();
 };
 
-export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized = false, onMaximize }) => {
+export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized = false, onMaximize, userName = "" }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -89,7 +89,7 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     const newUserMessage = {
       id: userMessageId,
       text: userMessage,
-      sender: "user",
+      sender: userName || "user",
       timestamp: new Date().toISOString(),
       isVoice: true,
     };
@@ -410,7 +410,7 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     const newUserMessage = {
       id: userMessageId,
       text: userMessage,
-      sender: "user",
+      sender: userName || "user",
       timestamp: new Date().toISOString(),
     };
 

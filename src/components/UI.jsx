@@ -3,10 +3,24 @@ import { Suspense, useEffect, useState } from "react";
 import { Experience } from "./Experience";
 import { ChatInterface } from "./ChatInterface";
 import MenuBar from "./layout/MenuBar";
+import UserNameModal from "./UserNameModal";
+import { useLocation } from "react-router-dom";
 
 export const UI = () => {
+  const location = useLocation();
   const [isMicAlwaysOn, setIsMicAlwaysOn] = useState(false);
   const [isChatMaximized, setIsChatMaximized] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [showModal, setShowModal] = useState(true);
+
+  // Always clear userName on home page load to force popup
+  useEffect(() => {
+    if (location.pathname === "/" || location.pathname === "/home" || location.pathname === "/index") {
+      localStorage.removeItem('userName');
+      setUserName("");
+      setShowModal(true);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const savedMicSetting = localStorage.getItem('micAlwaysOn');
@@ -23,8 +37,15 @@ export const UI = () => {
     setIsChatMaximized((prev) => !prev);
   };
 
+  const handleUserNameSubmit = (name) => {
+    setUserName(name);
+    localStorage.setItem('userName', name);
+    setShowModal(false);
+  };
+
   return (
     <section className="flex flex-col-reverse lg:flex-row h-full w-full"> 
+      {showModal && <UserNameModal onSubmit={handleUserNameSubmit} />}
       <div className="flex-1 bg-gradient-to-br from-purple-950 via-blue-900 via-indigo-800 to-black relative transition-all duration-300">
         <div className="absolute top-0 left-0 flex items-center p-4">
           <img 
@@ -49,6 +70,7 @@ export const UI = () => {
             micAlwaysOn={isMicAlwaysOn} 
             minimized={!isChatMaximized}
             onMaximize={toggleChatMaximize}
+            userName={userName}
           />
           {isChatMaximized && (
             <button 

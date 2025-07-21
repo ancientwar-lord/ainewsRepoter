@@ -7,7 +7,6 @@ import { useNavigate } from "react-router-dom";
 
 const baseMenuList = [
   { name: "Home", icon: "home" },
-  { name: "Settings", icon: "settings" },
 ];
 
 export default function MenuBar() {

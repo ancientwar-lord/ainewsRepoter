@@ -297,7 +297,8 @@ class SpeechRecognitionService {
       console.log('Wake word detected! Activating system...');
       this.clearInactivityTimer();
       this.systemState = 'active';
-      this.speak('Hi Abhishek', () => {
+      const userName = localStorage.getItem('userName') || 'there';
+      this.speak(`Hi ${userName}`, () => {
         console.log('System activated, ready for queries');
         if (this.onWakeWordDetected) {
           this.onWakeWordDetected();
@@ -310,7 +311,8 @@ class SpeechRecognitionService {
     } else if (this.systemState === 'active' && lowerTranscript.includes(this.deactivationPhrase)) {
       console.log('Deactivation phrase detected! Returning to listening state...');
       this.systemState = 'listening';
-      this.speak('Okay, Abhishek', () => {
+      const userName = localStorage.getItem('userName') || 'there';
+      this.speak(`Okay, ${userName}`, () => {
         console.log('System deactivated, waiting for wake word');
         this.startInactivityTimer(); // Start timer when going back to listening
         if (this.onDeactivationDetected) {
