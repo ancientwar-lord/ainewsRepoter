@@ -1,4 +1,18 @@
 class SpeechRecognitionService {
+  // --- Inactivity Timer Pause/Resume ---
+  pauseInactivityTimer() {
+    this.clearInactivityTimer();
+    this._inactivityPaused = true;
+    console.log('Inactivity timer paused');
+  }
+
+  resumeInactivityTimer() {
+    if (this._inactivityPaused) {
+      this._inactivityPaused = false;
+      this.startInactivityTimer();
+      console.log('Inactivity timer resumed');
+    }
+  }
   constructor() {
     this.recognition = null;
     this.isSupported = false;
@@ -431,7 +445,10 @@ class SpeechRecognitionService {
   // Inactivity management
   startInactivityTimer() {
     this.clearInactivityTimer();
-    
+    if (this._inactivityPaused) {
+      console.log('Inactivity timer is paused, not starting');
+      return;
+    }
     if (this.systemState === 'listening') {
       console.log('Starting inactivity timer for 30 seconds...');
       this.inactivityTimer = setTimeout(() => {

@@ -1,6 +1,12 @@
+  // Toggle listening state (mic button handler)
+  const toggleListening = () => {
+    // handleMicButton is async, but we don't need to await for UI click
+    handleMicButton();
+  };
 import { useState, useRef, useEffect, useCallback } from "react";
 import { geminiService } from "../services/geminiService";
 import { lipsyncTTSService } from "../services/lipsyncTTSService";
+import { getTodaysNewsSummary } from "../services/ioIntelService";
 import { speechRecognitionService } from "../services/speechRecognitionService";
 import { conversationService } from "../services/conversationService";
 import { lipsyncManager } from "../App";
@@ -59,6 +65,155 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
   // System prompt state removed
+
+  // --- TTS Interruption State ---
+  // (Declarations moved to top of component)
+  const handleSubmitSpeech = useCallback(async (speechText) => {
+    if (!speechText.trim() || isLoading) return;
+
+    // Stop any current speech before starting new response
+    clearTTSQueue();
+
+    const userMessage = speechText.trim();
+    setInputMessage("");
+    setError(null);
+
+    // Create an abort controller for this request
+    const controller = new AbortController();
+    setAbortController(controller);
+    currentTTSController.current = new AbortController();
+
+    const userMessageId = crypto.randomUUID();
+    const aiMessageId = crypto.randomUUID();
+
+    const newUserMessage = {
+      id: userMessageId,
+      text: userMessage,
+      sender: "user",
+      timestamp: new Date().toISOString(),
+      isVoice: true,
+    };
+
+    setMessages(prev => [...prev, newUserMessage]);
+    setIsLoading(true);
+    
+    // Update activity with the latest user message (voice input)
+    updateActivity("Processing", userMessage);
+
+    try {
+      const { isNews, keyword } = parseNewsQuery(userMessage);
+      if (isNews) {
+        let summary;
+        if (keyword) {
+          if (typeof getTodaysNewsSummary === 'function' && getTodaysNewsSummary.length > 0) {
+            summary = await getTodaysNewsSummary(keyword);
+          } else {
+            summary = await getTodaysNewsSummary();
+          }
+        } else {
+          summary = await getTodaysNewsSummary();
+        }
+        setMessages(prev => [...prev, {
+          id: aiMessageId,
+          text: summary,
+          sender: "ai",
+          timestamp: new Date().toISOString(),
+        }]);
+        if (autoSpeak) await lipsyncTTSService.speakWithLipsync(summary);
+        updateActivity("Ready", "", summary.substring(0, 100) + (summary.length > 100 ? "..." : ""));
+      } else {
+        // ...existing code for Gemini...
+        const aiMessage = {
+          id: aiMessageId,
+          text: "",
+          sender: "ai",
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+        };
+        setMessages(prev => [...prev, aiMessage]);
+
+        let fullResponse = "";
+        let lastProcessedLength = 0;
+
+        await geminiService.generateStreamingResponse(
+          userMessage,
+          async (chunk, responseText) => {
+            // Check if request was aborted
+            if (controller.signal.aborted) {
+              console.log('ChatInterface: Request aborted, stopping streaming (voice)');
+              return;
+            }
+            
+            fullResponse = responseText;
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === aiMessageId
+                  ? { ...msg, text: responseText }
+                  : msg
+              )
+            );
+
+            // Process new text for speech if auto-speak is enabled
+            if (autoSpeak && !controller.signal.aborted) {
+              const newText = responseText.slice(lastProcessedLength);
+              if (newText.trim()) {
+                console.log('Processing new text chunk (voice):', newText.substring(0, 50) + '...');
+                
+                const { readyText, remainingText } = extractSpeechableText(newText);
+                
+                if (readyText) {
+                  console.log('Adding ready text to TTS queue (voice):', readyText.substring(0, 50) + '...');
+                  addToTTSQueue(readyText);
+                  lastProcessedLength = responseText.length - remainingText.length;
+                }
+              }
+            }
+          },
+          controller.signal // Pass abort signal to the streaming service
+        );
+
+        // Check if request was aborted before completing
+        if (controller.signal.aborted) {
+          console.log('ChatInterface: Request aborted, cleaning up (voice)');
+          clearTTSQueue();
+          return;
+        }
+
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === aiMessageId
+              ? { ...msg, isStreaming: false }
+              : msg
+          )
+        );
+
+        // Update activity with the final AI response (voice input)
+        updateActivity("Ready", "", fullResponse.substring(0, 100) + (fullResponse.length > 100 ? "..." : ""));
+
+        // Process any remaining text for speech
+        if (autoSpeak && !controller.signal.aborted && fullResponse.trim()) {
+          const remainingText = fullResponse.slice(lastProcessedLength);
+          if (remainingText.trim()) {
+            console.log('Processing remaining text (voice):', remainingText.substring(0, 50) + '...');
+            addToTTSQueue(remainingText);
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('ChatInterface: Request was aborted (voice)');
+        // Remove the incomplete AI message
+        setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
+      } else {
+        setError(err.message);
+        setMessages(prev => prev.filter(msg => msg.sender === "user"));
+      }
+      clearTTSQueue();
+    } finally {
+      setIsLoading(false);
+      setAbortController(null);
+    }
+  }, [isLoading, autoSpeak, abortController]);
 
     // TTS streaming state
   const [ttsQueue, setTtsQueue] = useState([]);
@@ -120,6 +275,57 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     return () => clearTimeout(timeoutId);
   }, [messages]);
 
+
+  // --- TTS Interruption State ---
+  const [ttsInterruptible, setTtsInterruptible] = useState(false);
+  const [awaitingUserQuery, setAwaitingUserQuery] = useState(false);
+  const ttsInterruptPhrase = "okay lotus";
+
+  // Patch: Pause inactivity timer when TTS starts, resume when TTS ends
+  useEffect(() => {
+    if (isSpeaking || isStreamingSpeech) {
+      speechRecognitionService.pauseInactivityTimer?.();
+      setTtsInterruptible(true);
+    } else {
+      speechRecognitionService.resumeInactivityTimer?.();
+      setTtsInterruptible(false);
+    }
+  }, [isSpeaking, isStreamingSpeech]);
+
+  // Patch: Listen for 'okay lotus' phrase to interrupt TTS
+  useEffect(() => {
+    if (!ttsInterruptible) return;
+    const phraseListener = (result) => {
+      if (result && result.final && result.final.toLowerCase().includes(ttsInterruptPhrase)) {
+        // Stop TTS, set awaiting user query
+        stopSpeaking();
+        setAwaitingUserQuery(true);
+      }
+    };
+    speechRecognitionService.onResultCallback(phraseListener);
+    return () => {
+      // Restore normal callback after TTS
+      speechRecognitionService.onResultCallback(null);
+    };
+  }, [ttsInterruptible]);
+
+  // Patch: After TTS interrupted, next user speech is captured as query
+  useEffect(() => {
+    if (!awaitingUserQuery) return;
+    const captureQuery = (result) => {
+      if (result && result.final && result.final.trim() && !result.final.toLowerCase().includes(ttsInterruptPhrase)) {
+        setAwaitingUserQuery(false);
+        // Submit as user query
+        handleSubmitSpeech(result.final.trim());
+      }
+    };
+    speechRecognitionService.onResultCallback(captureQuery);
+    return () => {
+      // Restore normal callback after query
+      speechRecognitionService.onResultCallback(null);
+    };
+  }, [awaitingUserQuery, handleSubmitSpeech]);
+
   const handleSpeak = useCallback(async (text) => {
     if (!text.trim()) return;
     try {
@@ -133,7 +339,43 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     }
   }, []);
 
-  // System prompt handler removed
+
+  // Handler for "Today's Updates" button
+  const handleTodaysUpdates = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const summary = await getTodaysNewsSummary();
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        text: summary,
+        sender: "ai",
+        timestamp: new Date().toISOString(),
+      }]);
+      await lipsyncTTSService.speakWithLipsync(summary);
+    } catch (err) {
+      setError("Failed to fetch news updates: " + (err.message || err));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Detects if the message is a news update query and extracts keyword if present
+  const parseNewsQuery = (msg) => {
+    // Match: provide me the news update about <keyword>
+    const aboutPattern = /provide\s+me\s+(the\s+)?news\s+update\s+about\s+(.+)/i;
+    const genericPattern = /provide\s+me\s+(the\s+)?(news|latest)\s+update/i;
+    const aboutMatch = msg.match(aboutPattern);
+    if (aboutMatch) {
+      // Extract keyword, trim, and remove trailing punctuation
+      let keyword = aboutMatch[2].trim().replace(/[.?!,;:]+$/, "");
+      return { isNews: true, keyword };
+    }
+    if (genericPattern.test(msg)) {
+      return { isNews: true, keyword: null };
+    }
+    return { isNews: false, keyword: null };
+  };
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
@@ -179,93 +421,118 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     updateActivity("Processing", userMessage);
 
     try {
-      const aiMessage = {
-        id: aiMessageId,
-        text: "",
-        sender: "ai",
-        timestamp: new Date().toISOString(),
-        isStreaming: true,
-      };
-      setMessages(prev => [...prev, aiMessage]);
-
-      let fullResponse = "";
-      let lastProcessedLength = 0;
-
-      // Prepare context: all previous messages as {role, content}
-      const context = messages.map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.text
-      }));
-
-      // Generate response with streaming
-      await geminiService.generateStreamingResponse(
-        userMessage,
-        async (chunk, responseText) => {
-          // Check if request was aborted
-          if (controller.signal.aborted) {
-            console.log('ChatInterface: Request aborted, stopping streaming');
-            return;
+      const { isNews, keyword } = parseNewsQuery(userMessage);
+      if (isNews) {
+        // Use News API, pass keyword if present
+        let summary;
+        if (keyword) {
+          // If getTodaysNewsSummary supports a keyword/topic argument, pass it
+          if (typeof getTodaysNewsSummary === 'function' && getTodaysNewsSummary.length > 0) {
+            summary = await getTodaysNewsSummary(keyword);
+          } else {
+            // If not, fallback to generic
+            summary = await getTodaysNewsSummary();
           }
-          
-          fullResponse = responseText;
-          
-          // Update UI with the latest response
-          setMessages(prev =>
-            prev.map(msg =>
-              msg.id === aiMessageId
-                ? { ...msg, text: responseText }
-                : msg
-            )
-          );
+        } else {
+          summary = await getTodaysNewsSummary();
+        }
+        setMessages(prev => [...prev, {
+          id: aiMessageId,
+          text: summary,
+          sender: "ai",
+          timestamp: new Date().toISOString(),
+        }]);
+        if (autoSpeak) await lipsyncTTSService.speakWithLipsync(summary);
+        updateActivity("Ready", "", summary.substring(0, 100) + (summary.length > 100 ? "..." : ""));
+      } else {
+        // ...existing code for Gemini...
+        const aiMessage = {
+          id: aiMessageId,
+          text: "",
+          sender: "ai",
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+        };
+        setMessages(prev => [...prev, aiMessage]);
 
-          // Process new text for speech if auto-speak is enabled
-          if (autoSpeak && !controller.signal.aborted) {
-            const newText = responseText.slice(lastProcessedLength);
-            if (newText.trim()) {
-              console.log('Processing new text chunk:', newText.substring(0, 50) + '...');
-              
-              const { readyText, remainingText } = extractSpeechableText(newText);
-              
-              if (readyText) {
-                console.log('Adding ready text to TTS queue:', readyText.substring(0, 50) + '...');
-                addToTTSQueue(readyText);
-                lastProcessedLength = responseText.length - remainingText.length;
+        let fullResponse = "";
+        let lastProcessedLength = 0;
+
+        // Prepare context: all previous messages as {role, content}
+        const context = messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+
+        // Generate response with streaming
+        await geminiService.generateStreamingResponse(
+          userMessage,
+          async (chunk, responseText) => {
+            // Check if request was aborted
+            if (controller.signal.aborted) {
+              console.log('ChatInterface: Request aborted, stopping streaming');
+              return;
+            }
+            
+            fullResponse = responseText;
+            
+            // Update UI with the latest response
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === aiMessageId
+                  ? { ...msg, text: responseText }
+                  : msg
+              )
+            );
+
+            // Process new text for speech if auto-speak is enabled
+            if (autoSpeak && !controller.signal.aborted) {
+              const newText = responseText.slice(lastProcessedLength);
+              if (newText.trim()) {
+                console.log('Processing new text chunk:', newText.substring(0, 50) + '...');
+                
+                const { readyText, remainingText } = extractSpeechableText(newText);
+                
+                if (readyText) {
+                  console.log('Adding ready text to TTS queue:', readyText.substring(0, 50) + '...');
+                  addToTTSQueue(readyText);
+                  lastProcessedLength = responseText.length - remainingText.length;
+                }
               }
             }
+          },
+          context,
+          controller.signal // Pass abort signal as options if needed
+        );
+
+        // Check if request was aborted before completing
+        if (controller.signal.aborted) {
+          console.log('ChatInterface: Request aborted, cleaning up');
+          clearTTSQueue();
+          return;
+        }
+
+        // Mark streaming as complete
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === aiMessageId
+              ? { ...msg, isStreaming: false }
+              : msg
+          )
+        );
+
+        // Update activity with the final AI response
+        updateActivity("Ready", "", fullResponse.substring(0, 100) + (fullResponse.length > 100 ? "..." : ""));
+
+        // Process any remaining text for speech
+        if (autoSpeak && !controller.signal.aborted && fullResponse.trim()) {
+          const remainingText = fullResponse.slice(lastProcessedLength);
+          if (remainingText.trim()) {
+            console.log('Processing remaining text:', remainingText.substring(0, 50) + '...');
+            addToTTSQueue(remainingText);
           }
-        },
-        context,
-        controller.signal // Pass abort signal as options if needed
-      );
-
-      // Check if request was aborted before completing
-      if (controller.signal.aborted) {
-        console.log('ChatInterface: Request aborted, cleaning up');
-        clearTTSQueue();
-        return;
-      }
-
-      // Mark streaming as complete
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === aiMessageId
-            ? { ...msg, isStreaming: false }
-            : msg
-        )
-      );
-
-      // Update activity with the final AI response
-      updateActivity("Ready", "", fullResponse.substring(0, 100) + (fullResponse.length > 100 ? "..." : ""));
-
-      // Process any remaining text for speech
-      if (autoSpeak && !controller.signal.aborted && fullResponse.trim()) {
-        const remainingText = fullResponse.slice(lastProcessedLength);
-        if (remainingText.trim()) {
-          console.log('Processing remaining text:', remainingText.substring(0, 50) + '...');
-          addToTTSQueue(remainingText);
         }
       }
-
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('ChatInterface: Request was aborted');
@@ -489,181 +756,6 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     setContinuousListening(micAlwaysOn);
     setConversationMode(micAlwaysOn);
     
-    if (micAlwaysOn && speechRecognitionSupported && !isListening && !isSpeaking) {
-      console.log('Starting conversation mode...');
-      conversationService.startConversationMode();
-    } else if (!micAlwaysOn && conversationService.isInConversationMode()) {
-      console.log('Stopping conversation mode...');
-      conversationService.stopConversationMode();
-    }
-  }, [micAlwaysOn, speechRecognitionSupported, isListening, isSpeaking]);
-
-  // Setup conversation service callbacks
-  useEffect(() => {
-    conversationService.setCallbacks({
-      onUserSpeechStart: () => {
-        console.log('ChatInterface: User speech detected');
-        setError(null);
-      },
-      onUserSpeechEnd: () => {
-        console.log('ChatInterface: User speech ended');
-      },
-      onTTSStart: () => {
-        console.log('ChatInterface: TTS started via conversation service');
-        setIsSpeaking(true);
-      },
-      onTTSEnd: () => {
-        console.log('ChatInterface: TTS ended via conversation service');
-        setIsSpeaking(false);
-        setIsStreamingSpeech(false);
-      },
-      onConversationStateChange: (state) => {
-        console.log('ChatInterface: Conversation state changed:', state);
-        if (state.isListening !== undefined) {
-          setIsListening(state.isListening);
-        }
-        if (state.isSpeaking !== undefined) {
-          setIsSpeaking(state.isSpeaking);
-        }
-        if (state.isConversationMode !== undefined) {
-          setConversationMode(state.isConversationMode);
-        }
-      },
-    });
-
-    // Cleanup on unmount
-    return () => {
-      conversationService.cleanup();
-    };
-  }, []);
-
-  // Handle speech recognition submission
-  const handleSubmitSpeech = useCallback(async (speechText) => {
-    if (!speechText.trim() || isLoading) return;
-
-    // Stop any current speech before starting new response
-    clearTTSQueue();
-
-    const userMessage = speechText.trim();
-    setInputMessage("");
-    setError(null);
-
-    // Create an abort controller for this request
-    const controller = new AbortController();
-    setAbortController(controller);
-    currentTTSController.current = new AbortController();
-
-    const userMessageId = crypto.randomUUID();
-    const aiMessageId = crypto.randomUUID();
-
-    const newUserMessage = {
-      id: userMessageId,
-      text: userMessage,
-      sender: "user",
-      timestamp: new Date().toISOString(),
-      isVoice: true,
-    };
-
-    setMessages(prev => [...prev, newUserMessage]);
-    setIsLoading(true);
-    
-    // Update activity with the latest user message (voice input)
-    updateActivity("Processing", userMessage);
-
-    try {
-      const aiMessage = {
-        id: aiMessageId,
-        text: "",
-        sender: "ai",
-        timestamp: new Date().toISOString(),
-        isStreaming: true,
-      };
-      setMessages(prev => [...prev, aiMessage]);
-
-      let fullResponse = "";
-      let lastProcessedLength = 0;
-
-      await geminiService.generateStreamingResponse(
-        userMessage,
-        async (chunk, responseText) => {
-          // Check if request was aborted
-          if (controller.signal.aborted) {
-            console.log('ChatInterface: Request aborted, stopping streaming (voice)');
-            return;
-          }
-          
-          fullResponse = responseText;
-          setMessages(prev =>
-            prev.map(msg =>
-              msg.id === aiMessageId
-                ? { ...msg, text: responseText }
-                : msg
-            )
-          );
-
-          // Process new text for speech if auto-speak is enabled
-          if (autoSpeak && !controller.signal.aborted) {
-            const newText = responseText.slice(lastProcessedLength);
-            if (newText.trim()) {
-              console.log('Processing new text chunk (voice):', newText.substring(0, 50) + '...');
-              
-              const { readyText, remainingText } = extractSpeechableText(newText);
-              
-              if (readyText) {
-                console.log('Adding ready text to TTS queue (voice):', readyText.substring(0, 50) + '...');
-                addToTTSQueue(readyText);
-                lastProcessedLength = responseText.length - remainingText.length;
-              }
-            }
-          }
-        },
-        controller.signal // Pass abort signal to the streaming service
-      );
-
-      // Check if request was aborted before completing
-      if (controller.signal.aborted) {
-        console.log('ChatInterface: Request aborted, cleaning up (voice)');
-        clearTTSQueue();
-        return;
-      }
-
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === aiMessageId
-            ? { ...msg, isStreaming: false }
-            : msg
-        )
-      );
-
-      // Update activity with the final AI response (voice input)
-      updateActivity("Ready", "", fullResponse.substring(0, 100) + (fullResponse.length > 100 ? "..." : ""));
-
-      // Process any remaining text for speech
-      if (autoSpeak && !controller.signal.aborted && fullResponse.trim()) {
-        const remainingText = fullResponse.slice(lastProcessedLength);
-        if (remainingText.trim()) {
-          console.log('Processing remaining text (voice):', remainingText.substring(0, 50) + '...');
-          addToTTSQueue(remainingText);
-        }
-      }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log('ChatInterface: Request was aborted (voice)');
-        // Remove the incomplete AI message
-        setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
-      } else {
-        setError(err.message);
-        setMessages(prev => prev.filter(msg => msg.sender === "user"));
-      }
-      clearTTSQueue();
-    } finally {
-      setIsLoading(false);
-      setAbortController(null);
-    }
-  }, [isLoading, autoSpeak, abortController]);
-
-  const toggleListening = async () => {
-    console.log('Toggle listening called. Current state:', { 
       speechRecognitionSupported, 
       isListening,
       isSpeaking,
@@ -671,45 +763,46 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
       conversationMode
     });
 
-    if (!speechRecognitionSupported) {
-      console.error('Speech recognition not supported');
-      setError("Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
-      return;
-    }
+    const handleMicButton = async () => {
+      if (!speechRecognitionSupported) {
+        console.error('Speech recognition not supported');
+        setError("Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
+        return;
+      }
 
-    // If in conversation mode, toggle conversation service
-    if (conversationMode) {
-      if (conversationService.isInConversationMode()) {
-        console.log('Stopping conversation mode...');
-        conversationService.stopConversationMode();
-        setConversationMode(false);
+      // If in conversation mode, toggle conversation service
+      if (conversationMode) {
+        if (conversationService.isInConversationMode()) {
+          console.log('Stopping conversation mode...');
+          conversationService.stopConversationMode();
+          setConversationMode(false);
+        } else {
+          console.log('Starting conversation mode...');
+          await conversationService.startConversationMode();
+          setConversationMode(true);
+        }
+        return;
+      }
+
+      // Manual mode - standard toggle behavior
+      if (isListening) {
+        console.log('Stopping speech recognition...');
+        speechRecognitionService.stop();
       } else {
-        console.log('Starting conversation mode...');
-        await conversationService.startConversationMode();
-        setConversationMode(true);
+        if (isSpeaking) {
+          console.log('Stopping current speech before starting recognition...');
+          stopSpeaking();
+        }
+        
+        console.log('Starting speech recognition...');
+        const success = await speechRecognitionService.start();
+        
+        if (!success) {
+          console.error('Failed to start speech recognition');
+          setError("Failed to start speech recognition. Please check your microphone permissions.");
+        }
       }
-      return;
-    }
-
-    // Manual mode - standard toggle behavior
-    if (isListening) {
-      console.log('Stopping speech recognition...');
-      speechRecognitionService.stop();
-    } else {
-      if (isSpeaking) {
-        console.log('Stopping current speech before starting recognition...');
-        stopSpeaking();
-      }
-      
-      console.log('Starting speech recognition...');
-      const success = await speechRecognitionService.start();
-      
-      if (!success) {
-        console.error('Failed to start speech recognition');
-        setError("Failed to start speech recognition. Please check your microphone permissions.");
-      }
-    }
-  };
+    };
 
   // TTS streaming functions
   const extractSpeechableText = (text) => {
@@ -965,6 +1058,12 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
     <div className="flex flex-col h-[60vh] bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-indigo-800/20 backdrop-blur-sm rounded-lg shadow-lg overflow-hidden border border-purple-500/20">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-sm p-4  text-white border-b border-purple-500/30 flex-shrink-0 sticky top-0 z-10">
+        {/* News API instruction banner */}
+        <div className="mb-2 p-2 bg-blue-700/80 rounded text-xs text-white font-semibold shadow-lg flex items-center justify-center">
+          <span>
+            <b>Tip:</b> Type or say <span className="bg-white/20 px-1 rounded">"provide me the news update about"</span> or <span className="bg-white/20 px-1 rounded">"provide me the latest updates"</span> to get the latest news using the News API!
+          </span>
+        </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shadow-lg">
@@ -1003,6 +1102,14 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleTodaysUpdates}
+              className="px-3 py-1 rounded-lg text-sm bg-blue-500/20 text-blue-100 border border-blue-400/30 shadow-lg shadow-blue-500/20 hover:bg-blue-500/30 transition-colors"
+              disabled={isLoading}
+              title="Fetch and speak today's news updates"
+            >
+              📰 Today's Updates
+            </button>
             <button
               onClick={() => setAutoSpeak(!autoSpeak)}
               className={`px-3 py-1 rounded-lg text-sm transition-colors ${
@@ -1266,4 +1373,5 @@ export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized
       </div>
     </div>
   );
-};
+}
+// End of ChatInterface component
