@@ -37,7 +37,133 @@ npm run dev
 
 ## Usage
 
-LotusAi provides an intuitive chat interface with both text and voice interaction capabilities:
+
+LotusAi provides an intuitive chat interface with both text and voice interaction capabilities. Below is a detailed explanation of the implementation and usage of all major components and services in the project.
+
+---
+
+## 🛠️ Implementation Details
+
+### Main Components
+
+- **`App.jsx`**: Entry point for the app. Sets up routing, initializes the global lipsync manager, and exposes the TTS service globally for use by other modules.
+- **`UI.jsx`**: Main UI layout. Handles chat window state, microphone settings, and renders the 3D scene and chat interface.
+- **`Experience.jsx`**: Sets up the 3D scene using React Three Fiber, including camera controls, lighting, background effects, and the avatar.
+- **`Avatar.jsx`**: Loads and animates the 3D avatar model. Integrates with the lipsync manager to animate mouth movements in sync with speech and supports facial expressions.
+- **`ChatInterface.jsx`**: Manages the chat UI, message history, text/voice input, and interaction with AI and TTS services. Handles markdown-to-speech conversion and streaming responses.
+- **`MenuBar.jsx`**: Provides navigation and authentication controls (login/logout/settings) using Firebase Auth.
+- **`Login.jsx`**: Handles user authentication (login/register) with Firebase.
+- **`Register.jsx`**: (Currently empty) Placeholder for user registration UI.
+- **`Settings.jsx`**: (Currently empty) Placeholder for user settings UI.
+
+### Core Services
+
+- **`geminiService.js`**: Integrates with Google Gemini 2.0 Flash API for AI chat. Supports both standard and streaming responses, with system prompt/context support. Requires `VITE_GEMINI_API_KEY` in `.env`.
+- **`lipsyncTTSService.js`**: Manages text-to-speech using the Web Speech API and synchronizes mouth movements (visemes) on the avatar. Supports speech queueing, phoneme-to-viseme mapping, and user voice settings.
+- **`speechRecognitionService.js`**: Provides voice recognition using the Web Speech API. Implements wake word detection ("Hi Lotus"), deactivation, inactivity timeout, and manages recognition state and events.
+- **`conversationService.js`**: Orchestrates conversation flow, manages conversation mode (continuous listening), voice activity detection (VAD), and coordinates between TTS and STT services.
+- **`streamingSpeechService.js`**: Handles streaming speech output for AI responses, chunking long responses and synchronizing with lipsync.
+- **`ioIntelService.js`**: Integrates with IO Intelligence API for text summarization and news fetching. Requires `VITE_IOINTELLIGENCE_API_KEY` and `VITE_NEWSAPI_KEY` in `.env`.
+- **`firebase.js`**: Initializes Firebase for authentication and analytics. Requires Firebase config variables in `.env`.
+
+### 3D Models
+
+- **`public/models/686f742935402afcb99dd966.glb`**: Main avatar 3D model.
+- **`public/models/animations.glb`**: Animation data for avatar (idle, talking, etc).
+
+### Key Features Explained
+
+- **Voice Activation**: The app listens for the wake word "Hi Lotus" to activate voice recognition. Deactivation is triggered by "Thanks Lotus" or inactivity.
+- **Lipsync**: TTS output is analyzed for phonemes, which are mapped to visemes (mouth shapes) and animated on the avatar in real time.
+- **Streaming AI Responses**: Gemini AI responses are streamed and spoken in chunks, allowing for natural, low-latency conversation.
+- **Conversation Mode**: When enabled, the app continuously listens for user input and responds, creating a hands-free experience.
+- **Authentication**: Users can log in or register using Firebase Auth. MenuBar provides login/logout controls.
+- **Settings**: (Planned) User settings for voice, language, and preferences.
+
+---
+
+## 🧩 Usage Scenarios
+
+### 1. Chatting with the AI
+- Type or speak your message. The AI responds with both text and spoken output, with the avatar lipsyncing the response.
+
+### 2. Voice-Only Interaction
+- Say "Hi Lotus" to activate. Speak your query. The AI responds aloud. Say "Thanks Lotus" or wait for timeout to deactivate.
+
+### 3. Continuous Conversation
+- Enable conversation mode for hands-free, ongoing interaction. The app will listen and respond in a loop.
+
+### 4. News Summarization
+- Ask for news or summaries. The app fetches and summarizes news using IO Intelligence and NewsAPI.
+
+### 5. Authentication
+- Use the login/register UI to create an account or sign in. Auth state is managed via Firebase.
+
+---
+
+## 🏗️ Project Structure (Expanded)
+
+```
+src/
+├── components/
+│   ├── UI.jsx                # Main UI layout
+│   ├── ChatInterface.jsx     # Chat interface, voice/text input, message history
+│   ├── Experience.jsx        # 3D scene setup
+│   ├── Avatar.jsx            # 3D avatar, lipsync, facial animation
+│   ├── Login.jsx             # Login/register UI (Firebase)
+│   ├── Register.jsx          # (Planned) Registration UI
+│   ├── Settings.jsx          # (Planned) User settings
+│   └── layout/
+│       ├── MenuBar.jsx       # Navigation, auth controls
+│       └── HambergerIcon.jsx # Menu icon
+├── services/
+│   ├── geminiService.js           # Gemini AI API integration
+│   ├── lipsyncTTSService.js       # TTS with lipsync
+│   ├── speechRecognitionService.js# Voice recognition, wake word
+│   ├── conversationService.js     # Conversation mode, VAD
+│   ├── streamingSpeechService.js  # Streaming speech output
+│   ├── ioIntelService.js          # News/summarization APIs
+│   └── firebase.js                # Firebase auth/analytics
+├── App.jsx                   # App entry, routing, global managers
+├── index.css                 # Global styles (Tailwind)
+├── main.jsx                  # React entry point
+└── assets/                   # Static assets
+```
+
+---
+
+## 🔑 Environment Variables
+
+Create a `.env` file in the root with the following (replace with your keys):
+
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_IOINTELLIGENCE_API_KEY=your_io_intel_key
+VITE_NEWSAPI_KEY=your_newsapi_key
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_firebase_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+```
+
+---
+
+## 📚 Further Reading
+
+- [Google Gemini API Docs](https://ai.google.dev/docs)
+- [Wawa Lipsync](https://github.com/wawawario/wawa-lipsync)
+- [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API)
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber/getting-started/introduction)
+- [Firebase Auth](https://firebase.google.com/docs/auth)
+
+---
+
+For any questions or contributions, please contact the development team.
+
+**LotusAi** - Bringing AI conversations to life with natural voice interaction and 3D avatar technology.
 
 ### 🗣️ Voice Interaction
 
