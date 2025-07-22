@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ioChatCompletion } from "../services/ioChatService";
+import { fetchNewsArticles, storeArticlesInRAG, generateRagChunk } from "../services/newsRagService";
 import { lipsyncTTSService } from "../services/lipsyncTTSService";
 import { speechRecognitionService } from "../services/speechRecognitionService";
 import { conversationService } from "../services/conversationService";
@@ -41,6 +42,9 @@ const filterMarkdownForSpeech = (text) => {
 };
 
 export const ChatInterface = ({ micAlwaysOn = false, onActivityUpdate, minimized = false, onMaximize }) => {
+  // State for RAG update
+  const [isUpdatingRag, setIsUpdatingRag] = useState(false);
+  const [ragUpdateMsg, setRagUpdateMsg] = useState("");
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -214,6 +218,17 @@ const ioChatService = {
     updateActivity("Processing", userMessage);
 
     try {
+      // Generate the RAG chunk before sending to AI
+      let ragChunk = "";
+      try {
+        const chunk = await generateRagChunk(userMessage);
+        // If chunk is an array, join into a string
+        ragChunk = Array.isArray(chunk) ? chunk.join("\n") : (chunk || "");
+        console.log('ChatInterface: Generated RAG chunk:', ragChunk);
+      } catch (err) {
+        console.warn('Failed to generate RAG chunk:', err);
+        ragChunk = "";
+      }
       const aiMessage = {
         id: aiMessageId,
         text: "",
@@ -225,12 +240,15 @@ const ioChatService = {
 
       let fullResponse = "";
       let lastProcessedLength = 0;
-
+console.log("ragchunk", ragChunk);
       // Prepare context: all previous messages as {role, content}
-      const context = messages.map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.text
-      }));
+      const context = [
+        ...(ragChunk ? [{ role: 'system', content: ragChunk }] : []),
+        ...messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }))
+      ];
 
       // Generate response with streaming using ioChatService
       await ioChatService.generateStreamingResponse(
@@ -604,6 +622,16 @@ const ioChatService = {
     const userMessageId = crypto.randomUUID();
     const aiMessageId = crypto.randomUUID();
 
+    // Generate the RAG chunk before sending to AI
+    let ragChunk = "";
+    try {
+      const chunk = await generateRagChunk(userMessage);
+      ragChunk = Array.isArray(chunk) ? chunk.join("\n") : (chunk || "");
+    } catch (err) {
+      console.warn('Failed to generate RAG chunk (voice):', err);
+      ragChunk = "";
+    }
+
     const newUserMessage = {
       id: userMessageId,
       text: userMessage,
@@ -630,6 +658,15 @@ const ioChatService = {
 
       let fullResponse = "";
       let lastProcessedLength = 0;
+
+      const context = [
+        ...(ragChunk ? [{ role: 'system', content: ragChunk }] : []),
+      ];
+      // Add previous messages as context
+      context.push(...messages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.text
+      })));
 
       await ioChatService.generateStreamingResponse(
         userMessage,
@@ -665,6 +702,7 @@ const ioChatService = {
             }
           }
         },
+        context,
         controller.signal // Pass abort signal to the streaming service
       );
 
@@ -708,7 +746,7 @@ const ioChatService = {
       setIsLoading(false);
       setAbortController(null);
     }
-  }, [isLoading, autoSpeak, abortController]);
+  }, [isLoading, autoSpeak, abortController, messages]);
 
   const toggleListening = async () => {
     console.log('Toggle listening called. Current state:', { 
@@ -1008,6 +1046,21 @@ const ioChatService = {
     );
   }
 
+  // Handler for RAG update
+  const handleUpdateRag = async () => {
+    setIsUpdatingRag(true);
+    setRagUpdateMsg("");
+    try {
+      const articles = await fetchNewsArticles();
+      await storeArticlesInRAG(articles);
+      setRagUpdateMsg("🎉 Congratulations! Context is updated with today's latest news. Ask anything from the AI on any topic.");
+    } catch (err) {
+      setRagUpdateMsg("❌ Failed to update context: " + (err?.message || err));
+    } finally {
+      setIsUpdatingRag(false);
+    }
+  };
+
   // Render full interface
   return (
     <div className="flex flex-col h-[60vh] bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-indigo-800/20 backdrop-blur-sm rounded-lg shadow-lg overflow-hidden border border-purple-500/20">
@@ -1051,6 +1104,19 @@ const ioChatService = {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Update RAG with today's news button */}
+            <button
+              onClick={handleUpdateRag}
+              disabled={isUpdatingRag}
+              className="bg-blue-500/80 hover:bg-blue-600/80 px-3 py-1 rounded-lg text-sm transition-colors border border-blue-400/30 shadow-lg shadow-blue-500/20 flex items-center space-x-2"
+              title="Update RAG with today's news"
+            >
+              {isUpdatingRag ? (
+                <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></span>Updating...</span>
+              ) : (
+                <span className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Update News Context</span>
+              )}
+            </button>
             <button
               onClick={() => setAutoSpeak(!autoSpeak)}
               className={`px-3 py-1 rounded-lg text-sm transition-colors ${
@@ -1079,6 +1145,12 @@ const ioChatService = {
         </div>
       </div>
 
+      {/* RAG update message */}
+      {ragUpdateMsg && (
+        <div className="mx-4 mt-2 mb-2 p-3 bg-green-500/20 border border-green-400/30 rounded-lg text-green-200 text-sm backdrop-blur-sm z-10">
+          {ragUpdateMsg}
+        </div>
+      )}
       {/* Messages - Scrollable */}
       <div 
         ref={messagesContainerRef}

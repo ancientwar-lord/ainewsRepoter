@@ -9,7 +9,7 @@ class SpeechRecognitionService {
     
     // State management for wake word system
     this.systemState = 'listening'; // 'listening', 'active', or 'inactive'
-    this.activationPhrase = 'hi lotus';
+    this.activationPhrases = ['hi lotus', 'hello lotus','hi', 'hello','high lotus'];
     this.deactivationPhrase = 'thanks lotus';
     this.inactivityTimeout = 30000; // 30 seconds in milliseconds
     this.inactivityTimer = null;
@@ -275,11 +275,14 @@ class SpeechRecognitionService {
   processWakeWords(transcript) {
     const lowerTranscript = transcript.toLowerCase().trim();
     console.log('Processing wake words for:', lowerTranscript, 'Current state:', this.systemState);
-    
+
     // Reset inactivity timer on any speech input
     this.resetInactivityTimer();
-    
-    if ((this.systemState === 'listening' || this.systemState === 'inactive') && lowerTranscript.includes(this.activationPhrase)) {
+
+    // Check if any activation phrase is present
+    const activationDetected = this.activationPhrases.some(phrase => lowerTranscript.includes(phrase));
+
+    if ((this.systemState === 'listening' || this.systemState === 'inactive') && activationDetected) {
       console.log('Wake word detected! Activating system...');
       this.clearInactivityTimer();
       this.systemState = 'active';
@@ -376,8 +379,12 @@ class SpeechRecognitionService {
 
   // Configuration methods
   setActivationPhrase(phrase) {
-    this.activationPhrase = phrase.toLowerCase();
-    console.log('Activation phrase set to:', this.activationPhrase);
+    if (Array.isArray(phrase)) {
+      this.activationPhrases = phrase.map(p => p.toLowerCase());
+    } else {
+      this.activationPhrases = [phrase.toLowerCase()];
+    }
+    console.log('Activation phrases set to:', this.activationPhrases);
   }
 
   setDeactivationPhrase(phrase) {
