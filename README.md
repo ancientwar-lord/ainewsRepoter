@@ -1,15 +1,17 @@
 
+
 # LotusAi - AI Avatar Chat with Voice Interaction
 
-A React Three project featuring a 3D avatar with voice recognition and  lipsync capabilities, integrated with IO Intelligence Llama-4-Maverick FP8 AI model for faster response and IO Intelligence RAG api for latest news ingestion and retival to keep user upadted about the latest news.
+A React Three project featuring a 3D avatar with voice recognition and lip sync capabilities, integrated with the IO Intelligence Llama-4-Maverick FP8 AI model for faster response and IO Intelligence RAG API for the latest news ingestion and retrieval to keep users updated about the latest news.
+
 
 ## Features
 
-- 🎭 **3D Avatar with Lipsync Animation** - Realistic mouth movements synchronized with speech
-- 🤖 **IO Intelligence AI Llama-4-Maverick FP8 model for conversation** - Streaming responses with conversational AI 
-- 🗣️ **Text-to-Speech with Lipsync** - Hands-free interaction with wake word detection ("Hi Lotus")and on user query AI responses are spoken aloud with synchronized lip movements 
+- 🎭 **3D Avatar with Lip Sync Animation** - Realistic mouth movements synchronized with speech
+- 🤖 **IO Intelligence AI Llama-4-Maverick FP8 model for conversation** - Streaming responses with conversational AI
+- 🗣️ **Text-to-Speech with Lip Sync** - Hands-free interaction with wake word detection ("Hi Lotus"), and on user query, AI responses are spoken aloud with synchronized lip movements
 - ⚡ **Real-time Processing** - Instant voice recognition and TTS integration
-- 📰 **Latest News Updation** - AI proivde the latest news to keep users updated
+- 📰 **Latest News Update** - AI provides the latest news to keep users updated
 - 🔁 **Conversation Mode** - Continuous voice interaction with automatic wake word detection
 
 
@@ -41,25 +43,27 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 ## 🛠️ Implementation Details
 
 
+
 ### Main Components
 
-- **`ioChatService.js`**: Integrates with IO Intelligence AI Llama-4-Maverick FP8 mode for AI chat.
-- **`newsRagService.js`**: Implements Retrieval-Augmented Generation (RAG) for news and knowledge queries. This service fetches relevant news articles or documents, processes and embeds them in IO Intelligence RAG api, and augments AI responses with up-to-date, contextually relevant information. It leverages external news api and IO RAG retrieval logic to enhance the AI's ability to answer questions with real-world/ recent data.
+- **`ioChatService.js`**: Integrates with IO Intelligence AI Llama-4-Maverick FP8 model for AI chat.
+- **`newsRagService.js`**: Implements Retrieval-Augmented Generation (RAG) for news and knowledge queries. This service fetches relevant news articles or documents, processes and embeds them in the IO Intelligence RAG API, and augments AI responses with up-to-date, contextually relevant information. It leverages external news APIs and IO RAG retrieval logic to enhance the AI's ability to answer questions with real-world/recent data.
 - **`lipsyncTTSService.js`**: Manages text-to-speech using the Web Speech API and synchronizes mouth movements (visemes) on the avatar. Supports speech queueing, phoneme-to-viseme mapping, and user voice settings.
 - **`speechRecognitionService.js`**: Provides voice recognition using the Web Speech API. Implements wake word detection ("Hi Lotus"), deactivation, inactivity timeout, and manages recognition state and events.
 - **`conversationService.js`**: Orchestrates conversation flow, manages conversation mode (continuous listening), voice activity detection (VAD), and coordinates between TTS and STT services.
-- **`streamingSpeechService.js`**: Handles streaming speech output for AI responses, chunking long responses and synchronizing with lipsync.
+- **`streamingSpeechService.js`**: Handles streaming speech output for AI responses, chunking long responses and synchronizing with lip sync.
 - **`firebase.js`**: Initializes Firebase for authentication and analytics. Requires Firebase config variables in `.env`.
+
 
 
 ### Key Features Explained
 
 - **Voice Activation**: The app listens for the wake word "Hi Lotus" to activate voice recognition. Deactivation is triggered by "Thanks Lotus" or inactivity.
-- **Lipsync**: TTS output is analyzed for phonemes, which are mapped to visemes (mouth shapes) and animated on the avatar in real time.
-- **Streaming AI Responses**: IO Intelligence AI Llama-4-Maverick FP8 mode responses are streamed and spoken in chunks, allowing for natural, low-latency conversation.
-- **Latest News Updation**: The AI fetches and summarizes the latest news, providing users with up-to-date information and context-aware responses.
+- **Lip Sync**: TTS output is analyzed for phonemes, which are mapped to visemes (mouth shapes) and animated on the avatar in real time.
+- **Streaming AI Responses**: IO Intelligence AI Llama-4-Maverick FP8 model responses are streamed and spoken in chunks, allowing for natural, low-latency conversation.
+- **Latest News Update**: The AI fetches and summarizes the latest news, providing users with up-to-date information and context-aware responses.
 - **Conversation Mode**: When enabled, the app continuously listens for user input and responds, creating a hands-free experience.
-- **Authentication**: Users can log in or register using Firebase Auth. MenuBar provides login/logout controls.
+- **Authentication**: Users can log in or register using Firebase Auth. The MenuBar provides login/logout controls.
 
 
 ---
@@ -67,10 +71,10 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 ## 🧩 Usage Scenarios
 
 ### 1. Chatting with the AI
-- Type or speak your message. The AI responds with both text and spoken output, with the avatar lipsyncing the response.
+- Type or speak your message. The AI responds with both text and spoken output, with the avatar lip syncing the response.
 
 ### 2. Voice-Only Interaction
-- Say "Hi Lotus" to activate. Speak your query. The AI responds aloud. Say "Thanks Lotus" or wait for timeout to deactivate.
+- Say "Hi Lotus" to activate. Speak your query. The AI responds aloud. Say "Thanks Lotus" or wait for a timeout to deactivate.
 
 ### 3. Continuous Conversation
 - Enable conversation mode for hands-free, ongoing interaction. The app will listen and respond in a loop.
@@ -78,8 +82,9 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 ### 4. News Summarization
 - Ask for news or summaries. The app fetches and summarizes news using IO Intelligence and NewsAPI.
 
-### 5. Authentication(optinal)
+### 5. Authentication (optional)
 - Use the login/register UI to create an account or sign in. Auth state is managed via Firebase.
+
 
 
 
@@ -88,7 +93,8 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 - **Wake Word**: Say "Hi Lotus" to activate voice recognition
 - **Continuous Listening**: The system listens for the wake word and activates when detected
 - **Conversation Mode**: Toggle continuous conversation mode for hands-free interaction
-- **Deactivation**: Say "Thanks Lotus" to deactivate or let the system timeout after 30 seconds of inactivity
+- **Deactivation**: Say "Thanks Lotus" to deactivate or let the system time out after 30 seconds of inactivity
+
 
 ### 💬 Text Chat
 
@@ -97,11 +103,13 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 - **Message History**: Full conversation history is maintained
 
 
+
 ### Example Interactions
 
-- "Provide me the latest updates?"
-- "Tell me about artificial intelligence"
-- "Provide me the update in tech sector"
+- "Provide me the latest updates."
+- "Tell me about artificial intelligence."
+- "Provide me the update in the tech sector."
+
 
 
 ### Browser Compatibility
