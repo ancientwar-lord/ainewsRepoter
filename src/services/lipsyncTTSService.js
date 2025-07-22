@@ -705,13 +705,8 @@ class LipsyncTTSService {
     
     // Try to stop any Web Audio API contexts that might be running
     try {
-      if (window.AudioContext) {
-        // This is a more aggressive approach - we'll try to find and suspend any active audio contexts
-        const contextState = AudioContext.prototype.state;
-        if (contextState === 'running') {
-          console.log('Attempting to suspend active audio contexts');
-        }
-      }
+      // Removed problematic AudioContext.prototype.state access to avoid Illegal invocation error
+      // If you have references to created AudioContext instances, close or suspend them here
     } catch (error) {
       console.warn('Error handling audio contexts:', error);
     }
