@@ -9,9 +9,9 @@ class SpeechRecognitionService {
     
     // State management for wake word system
     this.systemState = 'listening'; // 'listening', 'active', or 'inactive'
-    this.activationPhrases = ['hi lotus', 'hello lotus','hi', 'hello','high lotus'];
-    this.deactivationPhrase = 'thanks lotus';
-    this.inactivityTimeout = 30000; // 30 seconds in milliseconds
+    this.activationPhrases = ['hi lotus', 'hello lotus','hi', 'hello','high lotus','hey lotus','hey','lotus'];
+    this.deactivationPhrase = ['thanks lotus', 'thank you lotus','okay lotus','stop lotus'];
+    this.inactivityTimeout = 200000; // 200 seconds in milliseconds
     this.inactivityTimer = null;
     this.lastActivityTime = Date.now();
     

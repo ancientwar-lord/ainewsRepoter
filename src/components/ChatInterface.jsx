@@ -221,7 +221,7 @@ const ioChatService = {
       // Generate the RAG chunk before sending to AI
       let ragChunk = "";
       try {
-        const chunk = await generateRagChunk(userMessage);
+        const chunk = await generateRagChunk(userMessage);ad
         // If chunk is an array, join into a string
         ragChunk = Array.isArray(chunk) ? chunk.join("\n") : (chunk || "");
         if (ragChunk) {
