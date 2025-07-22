@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Experience } from "./Experience";
 import { ChatInterface } from "./ChatInterface";
 import MenuBar from "./layout/MenuBar";
-import UserNameModal from "./UserNameModal";
+import IntroPopup from "./IntroPopup";
 import { useLocation } from "react-router-dom";
 
 export const UI = () => {
@@ -37,15 +37,13 @@ export const UI = () => {
     setIsChatMaximized((prev) => !prev);
   };
 
-  const handleUserNameSubmit = (name) => {
-    setUserName(name);
-    localStorage.setItem('userName', name);
+  const handleUserNameSubmit = () => {
     setShowModal(false);
   };
 
   return (
     <section className="flex flex-col-reverse lg:flex-row h-full w-full"> 
-      {showModal && <UserNameModal onSubmit={handleUserNameSubmit} />}
+      {showModal && <IntroPopup onSubmit={handleUserNameSubmit} />}
       <div className="flex-1 bg-gradient-to-br from-purple-950 via-blue-900 via-indigo-800 to-black relative transition-all duration-300">
         <div className="absolute top-0 left-0 flex items-center p-4">
           <img 

@@ -41,10 +41,9 @@ async function getTodaysNewsSummary(keyword) {
   const NEWS_API_KEY = import.meta.env.VITE_NEWSAPI_KEY;
   let NEWS_API_URL;
   if (keyword && typeof keyword === 'string' && keyword.trim().length > 0) {
-    // Use /v2/everything for topic-based news
     const encodedKeyword = encodeURIComponent(keyword.trim());
     // Sort by publishedAt for latest news, limit to English
-    NEWS_API_URL = `https://newsapi.org/v2/everything?q=${encodedKeyword}&language=en&sortBy=publishedAt&pageSize=20`;
+    NEWS_API_URL = `https://newsapi.org/v2/everything?q=${encodedKeyword}&language=en&sortBy=publishedAt`;
   } else {
     // Use top-headlines for generic news
     NEWS_API_URL = `https://newsapi.org/v2/top-headlines?language=en&pageSize=20`;
@@ -59,6 +58,7 @@ async function getTodaysNewsSummary(keyword) {
     throw new Error(`NewsAPI Error: ${newsResponse.status}`);
   }
   const newsData = await newsResponse.json();
+  console.log("Fetched news data:", newsData);
   if (!newsData.articles || newsData.articles.length === 0) {
     throw new Error("No news articles found.");
   }

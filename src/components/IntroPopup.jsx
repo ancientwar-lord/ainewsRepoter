@@ -1,16 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 
 const instructions = `This is the world of AI Avatar, where the AI News Reporter keeps you updated with every news update. You can interact and ask questions about anything to satisfy your curiosity.\nThis intelligent system combines real-time news aggregation with conversational AI capabilities, allowing users to:\n\n• Receive Automated News Updates: The AI avatar fetches the latest news and keep you updated\n• Ask Follow-up Questions: Users can interact with the avatar to ask questions about any news topic for deeper understanding\n• Experience Natural Conversations: The AI Avatar provides human-like responses and explanations about current events\n`;
 
-export default function UserNameModal({ onSubmit }) {
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (name.trim()) {
-      onSubmit(name.trim());
-    }
-  };
-
+export default function IntroPopup({ onSubmit }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -34,20 +26,20 @@ export default function UserNameModal({ onSubmit }) {
         }}
       >
         <div className="flex flex-col items-center gap-2 mb-4">
-          <img src="/logo.png" alt="Logo" className="w-14 h-14 rounded-full shadow-lg border-2 border-purple-300 bg-white/60" />
+          <img src="/logo.png" alt="Logo" className="w-14 h-14 rounded-full shadow-lg  " />
           <h2 className="text-3xl font-extrabold text-purple-800 drop-shadow mb-1 tracking-tight">Welcome!</h2>
         </div>
         <p className="mb-7 text-base text-gray-900 whitespace-pre-line font-medium leading-relaxed" style={{textShadow:'none'}}> {instructions} </p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          
+        <div className="flex flex-col gap-4">
           <button
-            type="submit"
+            type="button"
             className="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 via-pink-400 to-pink-500 shadow-lg hover:from-purple-600 hover:to-pink-600 hover:scale-105 transition-all text-white tracking-wide"
             style={{letterSpacing:'0.03em'}}
+            onClick={() => onSubmit && onSubmit()}
           >
             Get Started
           </button>
-        </form>
+        </div>
       </div>
       <style>{`
         @keyframes fadeIn {

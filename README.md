@@ -1,11 +1,12 @@
+
 # LotusAi - AI Avatar Chat with Voice Interaction
 
-A React Three Fiber project featuring a 3D avatar with lipsync capabilities, voice recognition, and integrated IO Intelligence AI Agent & Gemini AI.
+A React Three Fiber project featuring a 3D avatar with lipsync capabilities, voice recognition, integrated with IO Intelligence AI Llama-4-Maverick FP8 mode for faster response.
 
 ## Features
 
 - 🎭 **3D Avatar with Lipsync Animation** - Realistic mouth movements synchronized with speech
-- 🤖 **Gemini AI Chat Interface** - Streaming responses with conversational AI
+-- 🤖 **IO Intelligence AI Llama-4-Maverick FP8 mode Chat Interface** - Streaming responses with conversational AI
 - � **Voice Recognition** - Hands-free interaction with wake word detection ("Hi Lotus")
 - 🗣️ **Text-to-Speech with Lipsync** - AI responses are spoken aloud with synchronized lip movements
 - 🎨 **Modern UI** - Beautiful gradient interface with Tailwind CSS
@@ -21,8 +22,8 @@ npm install
 ```
 
 2. **Configure API Keys:**
-   - Create a `.env` file in the root directory and copy all env variables from the .env.sample
-   ```
+   - Create a `.env` file in the root directory and copy all env variables from the 
+   .env.sample
 
 3. **Start the development server:**
 ```bash
@@ -43,7 +44,7 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 ### Main Components
 
 
-- **`geminiService.js`**: Integrates with Google Gemini 2.0 Flash API for AI chat. Supports both standard and streaming responses, with system prompt/context support. Requires `VITE_GEMINI_API_KEY` in `.env`.
+- **`ioChatService.js`**: Integrates with IO Intelligence AI Llama-4-Maverick FP8 mode for AI chat. Supports both standard and streaming responses, with system prompt/context support.
 - **`lipsyncTTSService.js`**: Manages text-to-speech using the Web Speech API and synchronizes mouth movements (visemes) on the avatar. Supports speech queueing, phoneme-to-viseme mapping, and user voice settings.
 - **`speechRecognitionService.js`**: Provides voice recognition using the Web Speech API. Implements wake word detection ("Hi Lotus"), deactivation, inactivity timeout, and manages recognition state and events.
 - **`conversationService.js`**: Orchestrates conversation flow, manages conversation mode (continuous listening), voice activity detection (VAD), and coordinates between TTS and STT services.
@@ -57,7 +58,7 @@ LotusAi provides an intuitive chat interface with both text and voice interactio
 - **Voice Activation**: The app listens for the wake word "Hi Lotus" to activate voice recognition. Deactivation is triggered by "Thanks Lotus" or inactivity.
 
 - **Lipsync**: TTS output is analyzed for phonemes, which are mapped to visemes (mouth shapes) and animated on the avatar in real time.
-- **Streaming AI Responses**: Gemini AI responses are streamed and spoken in chunks, allowing for natural, low-latency conversation.
+- **Streaming AI Responses**: IO Intelligence AI Llama-4-Maverick FP8 mode responses are streamed and spoken in chunks, allowing for natural, low-latency conversation.
 - **Conversation Mode**: When enabled, the app continuously listens for user input and responds, creating a hands-free experience.
 - **Authentication**: Users can log in or register using Firebase Auth. MenuBar provides login/logout controls.
 

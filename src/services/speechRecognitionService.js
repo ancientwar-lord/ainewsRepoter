@@ -1,18 +1,4 @@
 class SpeechRecognitionService {
-  // --- Inactivity Timer Pause/Resume ---
-  pauseInactivityTimer() {
-    this.clearInactivityTimer();
-    this._inactivityPaused = true;
-    console.log('Inactivity timer paused');
-  }
-
-  resumeInactivityTimer() {
-    if (this._inactivityPaused) {
-      this._inactivityPaused = false;
-      this.startInactivityTimer();
-      console.log('Inactivity timer resumed');
-    }
-  }
   constructor() {
     this.recognition = null;
     this.isSupported = false;
@@ -297,8 +283,7 @@ class SpeechRecognitionService {
       console.log('Wake word detected! Activating system...');
       this.clearInactivityTimer();
       this.systemState = 'active';
-      const userName = localStorage.getItem('userName') || 'there';
-      this.speak(`Hi ${userName}`, () => {
+      this.speak('Hi Dear', () => {
         console.log('System activated, ready for queries');
         if (this.onWakeWordDetected) {
           this.onWakeWordDetected();
@@ -311,8 +296,7 @@ class SpeechRecognitionService {
     } else if (this.systemState === 'active' && lowerTranscript.includes(this.deactivationPhrase)) {
       console.log('Deactivation phrase detected! Returning to listening state...');
       this.systemState = 'listening';
-      const userName = localStorage.getItem('userName') || 'there';
-      this.speak(`Okay, ${userName}`, () => {
+      this.speak('Okay, Dear', () => {
         console.log('System deactivated, waiting for wake word');
         this.startInactivityTimer(); // Start timer when going back to listening
         if (this.onDeactivationDetected) {
@@ -447,10 +431,7 @@ class SpeechRecognitionService {
   // Inactivity management
   startInactivityTimer() {
     this.clearInactivityTimer();
-    if (this._inactivityPaused) {
-      console.log('Inactivity timer is paused, not starting');
-      return;
-    }
+    
     if (this.systemState === 'listening') {
       console.log('Starting inactivity timer for 30 seconds...');
       this.inactivityTimer = setTimeout(() => {
