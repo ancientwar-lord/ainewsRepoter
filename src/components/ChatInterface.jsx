@@ -140,10 +140,17 @@ const ioChatService = {
   async generateStreamingResponse(userMessage, onChunk, context = [], abortSignal) {
     // context is an array of {role, content}, userMessage is the latest user input
     // For now, just call ioChatCompletion with the full context
-    const messages = [
-      ...context,
-      { role: 'user', content: userMessage }
-    ];
+    let messages;
+    if (context && context.length > 0) {
+      messages = [
+        ...context,
+        { role: 'user', content: userMessage }
+      ];
+    } else {
+      messages = [
+        { role: 'user', content: userMessage }
+      ];
+    }
     let done = false;
     try {
       const response = await ioChatCompletion(messages);
@@ -923,7 +930,7 @@ const ioChatService = {
         <div className="flex-1 relative">
           <input
             type="text"
-            value={inputMessage}
+            value={interimTranscript || inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
