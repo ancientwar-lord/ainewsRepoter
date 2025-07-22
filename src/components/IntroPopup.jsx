@@ -1,6 +1,6 @@
 import React from "react";
 
-const instructions = `This is the world of AI Avatar, where the AI News Reporter keeps you updated with every news update. You can interact and ask questions about anything to satisfy your curiosity.\nThis intelligent system combines real-time news aggregation with conversational AI capabilities, allowing users to:\n\n• Receive Automated News Updates: The AI avatar fetches the latest news and keep you updated\n• Ask Follow-up Questions: Users can interact with the avatar to ask questions about any news topic for deeper understanding\n• Experience Natural Conversations: The AI Avatar provides human-like responses and explanations about current events\n`;
+const instructions = `The world of AI Avatar, where the AI News Reporter keeps you updated with every news update you need. You can interact and ask questions about anything to satisfy your curiosity. This intelligent system combines real-time news aggregation with conversational AI capabilities, allowing users to:\n• Experience Natural Conversations: The AI Avatar provides human-like responses and explanations about current events\n• Receive Automated News Updates: The AI avatar fetches the latest news and keep you updated\n• Ask Follow-up Questions: Users can interact with the avatar to ask questions about any news topic for deeper understanding\n`;
 
 export default function IntroPopup({ onSubmit }) {
   return (
@@ -29,7 +29,7 @@ export default function IntroPopup({ onSubmit }) {
           <img src="/logo.png" alt="Logo" className="w-14 h-14 rounded-full shadow-lg  " />
           <h2 className="text-3xl font-extrabold text-purple-800 drop-shadow mb-1 tracking-tight">Welcome!</h2>
         </div>
-        <p className="mb-7 text-base text-gray-900 whitespace-pre-line font-medium leading-relaxed" style={{textShadow:'none'}}> {instructions} </p>
+        <p className="mb-7 text-md text-gray-950 whitespace-pre-line font-medium leading-relaxed"> {instructions} </p>
         <div className="flex flex-col gap-4">
           <button
             type="button"

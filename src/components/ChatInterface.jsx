@@ -224,6 +224,9 @@ const ioChatService = {
         const chunk = await generateRagChunk(userMessage);
         // If chunk is an array, join into a string
         ragChunk = Array.isArray(chunk) ? chunk.join("\n") : (chunk || "");
+        if (ragChunk) {
+          ragChunk = `INSTRUCTION: Use the following news context ONLY if the user's query is about news, current events, or news updates. If the user's question is not related to news, ignore this context and use your own knowledge.\n\n${ragChunk}`;
+        }
         console.log('ChatInterface: Generated RAG chunk:', ragChunk);
       } catch (err) {
         console.warn('Failed to generate RAG chunk:', err);
@@ -627,6 +630,9 @@ console.log("ragchunk", ragChunk);
     try {
       const chunk = await generateRagChunk(userMessage);
       ragChunk = Array.isArray(chunk) ? chunk.join("\n") : (chunk || "");
+      if (ragChunk) {
+        ragChunk = `INSTRUCTION: Use the following news context ONLY if the user's query is about news, current events, or news updates. If the user's question is not related to news, ignore this context and use your own knowledge.\n\n${ragChunk}`;
+      }
     } catch (err) {
       console.warn('Failed to generate RAG chunk (voice):', err);
       ragChunk = "";
